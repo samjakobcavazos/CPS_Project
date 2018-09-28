@@ -1,0 +1,33 @@
+---
+title: "One Year Dropout Rate"
+author: "Samuel Cavazos"
+date: "September 27, 2018"
+runtime: shiny
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(kableExtra)
+library(ggplot2)
+library(DT)
+suppressPackageStartupMessages(library(dplyr))
+```
+
+```{r,cache=TRUE}
+studentDataRaw <- read.csv("studentDataRaw.csv")
+studentDataRaw <- within(studentDataRaw,{
+  entry_date <- as.Date(entry_date)
+  leave_date <- as.Date(leave_date)
+})
+```
+
+```{r}
+kable(head(studentDataRaw)) %>%
+  kable_styling(bootstrap_options = 'responsive')
+```
+
