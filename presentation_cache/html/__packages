@@ -1,0 +1,10 @@
+base
+shiny
+kableExtra
+ggplot2
+DT
+dplyr
+plotly
+bindrcpp
+leaflet
+sp

@@ -1,0 +1,434 @@
+---
+title: "2015-2016 Drop-Out Rate"
+author: "Samuel Cavazos"
+date: "Oct. 3rd, 2018"
+logo: cpslogo.png
+output: 
+  ioslides_presentation:
+    widescreen: true
+    css: style.css
+    transition: faster
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = FALSE,error = FALSE,warning=FALSE)
+nw.color <- '#4E2A84'
+library(kableExtra)
+library(ggplot2)
+library(plotly)
+library(DT)
+suppressPackageStartupMessages(library(dplyr))
+```
+
+
+## About Me
+<div style="float: left; width: 50%">
+```{r}
+# shapeFileUrl <- 'https://data.cityofchicago.org/api/geospatial/2mts-wp7t?method=export&format=Shapefile'
+# download.file(shapeFileUrl,'shapefile-SY1516.zip')
+# unzip('shapefile-SY1516.zip',exdir = 'shapefiles')
+# library(rgdal)
+# shapeFile <- rgdal::readOGR(dsn = 'shapefiles',layer = 'geo_export_bcce3b19-cb05-4141-8868-d82138dbed3c')
+# acc.data.hs <- readxl::read_xls('Accountability_SQRPratings_2017-2018_SchoolLevel.xls',sheet=3,skip=1)
+# acc.data.combo <- readxl::read_xls('Accountability_SQRPratings_2017-2018_SchoolLevel.xls',sheet=4,skip=1)
+# acc.data.hs <- acc.data.hs[-1,]
+# acc.data.combo <- acc.data.combo[-1,]
+# acc.data.hs$`1-Year Dropout Rate` <- as.numeric(acc.data.hs$`1-Year Dropout Rate`)
+# acc.data.combo$`1-Year Dropout Rate` <- as.numeric(acc.data.combo$`1-Year Dropout Rate`)
+# want <-
+#   data.frame(
+#     school_id = c(acc.data.hs$`School ID`,acc.data.combo$`School ID`),
+#     #network = c(acc.data.hs$Network,acc.data.combo$Network),
+#     dropout.rate = c(acc.data.hs$`1-Year Dropout Rate`,acc.data.combo$`1-Year Dropout Rate`),
+#     sqrp.total.points = c(acc.data.hs$`SQRP Total Points Earned`,acc.data.combo$`SQRP Total Points Earned`)
+#   )
+# shapeFile <- merge(shapeFile,want,by = 'school_id')
+# 
+# saveRDS(shapeFile,'shapeFile.rds')
+
+shapeFile <- readRDS('shapeFile.rds')
+library(leaflet)
+color <- colorNumeric('Reds',domain = shapeFile$dropout.rate)
+
+#renderLeaflet({
+    leaflet(shapeFile,width=500) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addCircleMarkers(~long,~lat,radius=~dropout.rate,
+                       color=~color(dropout.rate),
+                       popup = ~paste(
+                         paste0("<b><a href='https://cps.edu/Schools/Pages/school.aspx?SchoolID=",school_id,"'>",short_name,'</a></b>'),
+                         paste0('School ID: ',school_id),
+                         paste0('1-Year Drop-out Rate: ',dropout.rate,'%'),
+                         sep='<br/>'))
+#})
+```
+</div>
+
+<div style = "float: right; width: 45%;">
+<div>
+<div style="float: left; width: 50%;">
+```{r, out.width="60%"}
+knitr::include_graphics('nw.png')
+```
+</div>
+<div style="float: right' width: 50%>
+```{r,out.width="40%"}
+knitr::include_graphics('utrgv.png')
+```
+</div>
+<div>
+* [Homepage](https://samjakobcavazos.github.io/personal/)
+* [Github repo to this presentation](https://github.com/samjakobcavazos/CPS_Project)
+* [School Closures](https://samjakobcavazos.github.io/personal/chicago-school-timeline-map.html)
+* [Predictive Models using Student Data](https://samjakobcavazos.github.io/personal/predicting-college-admission.html)
+</div>
+</div>
+
+# SAS Code
+
+## 
+
+<div class="notes">
+This is my *note*.
+
+- It can contain markdown
+- like this list
+</div>
+
+<div class="code-scroll">
+```sas
+libname datum '~/../myshortcuts/SAS/CPS_Project/perf';
+
+data demog;
+    set datum.performancetask_demog;
+run;
+data finstat;
+    set datum.performancetask_finstat;
+run;
+
+data studentDataRaw;
+    merge demog finstat;
+    by student_unique_id;
+    if grade_level = '09' or grade_level = '10' or grade_level = '11' or grade_level = '12';
+    if (leave_date < input('2015-06-01',yymmdd10.) or entry_date > input('2016-06-30',yymmdd10.)) then delete;
+    
+    /* create empty values */
+    numerator=.;
+    denominator=.;
+    
+    /* set inital denominator values */
+    if leave_date >= input('2015-06-01',yymmdd10.) then denominator = 1;
+    
+    /* if still enrolled then include in denominator and exclude from numerator*/
+    if leave_date >= input('2016-06-30',yymmdd10.) then denominator = 1;
+    if leave_date >= input('2016-06-30',yymmdd10.) then numerator = 0;
+    
+    /* define denominator values for leave_codes */
+    if leave_code = '31' then denominator = 1;   
+    else if leave_code = '32' or leave_code = '33' or leave_code = '34' then do;
+    	if (
+    	  verified_transfer = 'yes' 
+    	  or verified_transfer = 'unknown'
+    	  or leave_date >= input('2016-02-01',yymmdd10.)
+    	) and denominator = . then denominator = 0;
+    	else denominator = 1;
+    end;
+    else if leave_code = '35' and denominator = . then denominator = 0;
+    else if leave_code = '40' and denominator = . then denominator = 0;
+    else if leave_code = '41' and denominator = . then denominator = 0;
+    else if leave_code = '52' and denominator = . then denominator = 1;
+    else if leave_code = '53' and denominator = . then denominator = 1;
+    else if leave_code = '55' and denominator = . then denominator = 1;
+    else if leave_code = '67' and denominator = . then denominator = 1;
+    else if leave_code = '86' and denominator = . then denominator = 1;
+    else if leave_code = '87' and denominator = . then denominator = 1;
+    else if leave_code = '88' and denominator = . then denominator = 1;
+    else if leave_code = '99' and denominator = . then denominator = 1;
+    
+    /* define numerator values for leave_codes */
+    if leave_code = '31' then numerator = 1;   
+    else if leave_code = '32' or leave_code = '33' or leave_code = '34' then do;
+    	if (
+    	verified_transfer = 'yes' 
+    	or verified_transfer = 'unknown'
+    	or leave_date >= input('2016-02-01',yymmdd10.)) and denominator ^= 1 then numerator = 0;
+    	else numerator = 1;
+    end;
+    else if leave_code = '35' and numerator =. then numerator = 0;
+    else if leave_code = '40' and numerator = . then numerator = 0;
+    else if leave_code = '41' and numerator = . then numerator = 0;
+    else if leave_code = '52' and numerator = . then numerator = 1;
+    else if leave_code = '53' and numerator = . then numerator = 1;
+    else if leave_code = '55' and numerator = . then numerator = 0;
+    else if leave_code = '67' and numerator = . then numerator = 1;
+    else if leave_code = '86' and numerator = . then numerator = 1;
+    else if leave_code = '87' and numerator = . then numerator = 1;
+    else if leave_code = '88' and numerator = . then numerator = 1;
+    else if leave_code = '99' and numerator = . then numerator = 1;
+run;
+
+data studentDataErrors;
+  set studentDataRaw;
+  if denominator = . or numerator = .;
+run;
+
+
+data studentData;
+  retain school_unique_id student_unique_id grade_level student_gender leave_code verified_transfer numerator denominator;
+  set studentDataRaw (keep=school_unique_id student_unique_id grade_level student_gender leave_code verified_transfer numerator denominator);
+  if numerator ^=. and denominator ^= .;
+run;
+
+/* create district level dataset */
+proc sql;
+  create table districtData as
+  select
+  	(
+  	  sum(numerator)/sum(denominator)
+  	) as overall_dropout_rate,
+  	(
+  	  sum((student_gender eq 'FEMALE')*numerator)/sum((student_gender eq 'FEMALE')*denominator)
+  	) as female_dropout_rate,
+  	(
+  	  sum((student_gender eq 'MALE')*numerator)/sum((student_gender eq 'MALE')*denominator)
+  	) as male_dropout_rate
+  from studentData;
+  quit;
+
+/* create school level dataset */
+proc sql;
+  create table schoolData as
+  select 
+  school_unique_id,
+  (
+  sum(numerator)/sum(denominator)
+  ) as schoolwide_dropout_rate,
+  (
+  sum((student_gender eq 'FEMALE')*numerator)/sum((student_gender eq 'FEMALE')*denominator)
+  ) as female_dropout_rate,
+  (
+  sum((student_gender eq 'MALE')*numerator)/sum((student_gender eq 'MALE')*denominator)
+  ) as male_dropout_rate
+  from studentData
+  group by school_unique_id;
+  quit;
+
+proc export data=studentDataRaw
+   outfile='~/../myshortcuts/SAS/CPS_Project/studentDataRaw.csv'
+   dbms=csv
+   replace;
+run;
+
+proc export data=studentDataErrors
+   outfile='~/../myshortcuts/SAS/CPS_Project/studentDataErrors.csv'
+   dbms=csv
+   replace;
+run;
+
+proc export data=districtData
+   outfile='~/../myshortcuts/SAS/CPS_Project/districtData.csv'
+   dbms=csv
+   replace;
+run;
+
+proc export data=schoolData
+   outfile='~/../myshortcuts/SAS/CPS_Project/schoolData.csv'
+   dbms=csv
+   replace;
+run;   
+
+proc delete data=work.demog work.finstat work.studentDataRaw;
+
+```
+</div>
+
+##
+Data files produced by the SAS code:
+
+  * `studentData.csv` - File containing only data columns requested in the packet.
+  * `studentDataRaw.csv` - File containing all student data and the computed numerator and denominator values.
+  * `studentErrors.csv` - File containing all students who were not assigned a numerator or denominator by our SAS code.
+  * `districtData.csv` - File containing our drop-out rate computations for the entire district.
+  * `schoolData.csv` - File containing our drop-out rate computations for each school.
+
+# Data Quality
+## Tools used for Data QA
+To check the quality of the data, I will be using **R**. To check the data for errors, we will be using the `studentDataRaw` data set generated by our SAS code. We will refer to it simply as `studentData`.
+
+```{r,cache=TRUE,echo=TRUE}
+studentData <- read.csv("studentDataRaw.csv")
+schoolData <- read.csv('schoolData.csv')
+districtData <- read.csv('districtData.csv')
+errors <- read.csv('studentDataErrors.csv')
+```
+
+```{r,include=FALSE}
+studentData <- within(studentData,{
+  entry_date <- as.Date(entry_date)
+  leave_date <- as.Date(leave_date)
+})
+errors <- within(errors,{
+  STUDENT_UNIQUE_ID <- factor(STUDENT_UNIQUE_ID)
+  SCHOOL_UNIQUE_ID <- factor(SCHOOL_UNIQUE_ID)
+  leave_date <- as.Date(leave_date)
+})
+```
+
+
+##
+For data quality check, we
+
+  1. Chose a handful of students with different `leave_code` and verify numerator/denominator indicators by hand.
+  2. Analyze the `studentDataErrors` dataset generated by our SAS script which contains `r nrow(errors)` errors.
+  3. Double check our `schoolData` calculations to see if they make sense and if there are any errors.
+  
+In this presentation we carry out bullets 2 and 3. We also discuss ways we may consider in improving our metric.
+
+  
+# studentDataErrors
+
+##
+There are `r nrow(errors)` students in the error file generated by our SAS code. Below is a summary of the data.
+
+<div class="code-scroll2">
+```{r}
+summary(errors[c("STUDENT_UNIQUE_ID","SCHOOL_UNIQUE_ID","grade_level","STUDENT_GENDER","leave_date","leave_code","verified_transfer","numerator","denominator")],maxsum=3)
+```
+</div>
+
+## Observations
+By analyzing the summary table, we observe the following:
+
+* Each of these students has  `leave_code = L` and `verified_transfer = 'N/A'`, as well as `denominator = 1`. Our SAS code is not programmed to deal with this leave code.
+* The range of `leave_date` is from `r format(range(errors$leave_date)[1],'%b %d %Y')` to `r format(range(errors$leave_date)[2],'%b %d %Y')`. This means that these students left during the school year.
+
+## Investigation
+
+We observed that `leave_code = L` and `verified_transfer = 'N/A'`. Based on the contingency table below, we see that there are other rows of data which meet this criteria though were assigned a numerator:
+
+```{r}
+x <- table(
+  studentData$verified_transfer,
+  studentData$leave_code
+) 
+x[57] <- paste0('<span style="color: red;">',x[57],"</span>")
+
+kable(x,escape=F) %>%
+  kable_styling('striped',bootstrap_options='responsive',font_size=14,full_width = TRUE) %>%
+  add_header_above(c("verified_transfer","leave_code"=16))
+```
+
+## 
+The range of `leave_date` for the students who did not receive a numerator is `r format(range(errors$leave_date)[1],'%B %d %Y')` to `r format(range(errors$leave_date)[2],'%B %d %Y')`, which means these students left during the school year. Is this significant? Below is a frequency chart of `leave_date` for all students with `leave_code=L` and `verified_transfer = N/A`.
+
+```{r,fig.height=3,fig.align='center'} 
+x<- studentData[studentData$leave_code=='L' &
+                     studentData$verified_transfer=='N/A',] %>%
+  mutate(numerator = sapply(numerator,function(i){if (is.na(i)){'Not Assigned'} else {i};}))
+ggplot(x,aes(x = leave_date,y=stat(density),color=numerator,group=numerator)) +
+  labs(title = 'Frequency of leave dates by numerator value',
+       x = 'Date',y = 'Number of students') +
+  geom_freqpoly() +
+  scale_x_date(date_labels = '%b %d \n %Y',limits = c(as.Date('2015-05-01'),as.Date('2016-09-01'))) +
+  #facet_wrap(~paste0('Numerator: ',numerator),scales='free_y') +
+  scale_color_discrete(name='Numerator') +
+  theme_minimal() +
+  theme(
+    strip.text.x = element_text(face='bold',size=12)
+    #legend.position = 'none'
+  )
+```
+
+The rest of the students with the same leave code and verified_transfer have a leave date between `r x <- range(studentData[studentData$leave_code=='L' & studentData$verified_transfer=='N/A' & !is.na(studentData$numerator),]$leave_date); format(x[1],'%B %d %Y')` and `r format(x[2],'%B %d %Y')`
+
+## Possible Solutions
+Possible solutions are:
+
+* Contact schools for further information about the student.
+* Edit metric definition/code system to reflect the situation these students fall under.
+
+# schoolData
+
+##
+Below shows a histogram of the School-wide drop-out rate computed by our SAS code.
+
+<div class='centered'>
+```{r}
+p <- ggplot(schoolData,aes(x=schoolwide_dropout_rate)) +
+  labs(title = 'Histogram of School-wide Drop-out Rate',
+       x = 'School Drop-out Rate',y='Number of schools') +
+  geom_histogram(color='tomato1',fill=nw.color) +
+  theme_minimal()
+p
+```
+</div>
+
+##
+`r nrow(schoolData[schoolData$schoolwide_dropout_rate==1,])` schools have a drop-out rate equal to 1. Why? 
+
+Further investigation is needed to determine why these schools were rated so high. We leave it as an exercise for the reader.
+
+```{r}
+x <- schoolData[schoolData$schoolwide_dropout_rate==1,]
+too.big <- studentData[studentData$SCHOOL_UNIQUE_ID %in% x$school_unique_id,] %>%
+  group_by(SCHOOL_UNIQUE_ID) %>%
+  summarise(number.of.students = length(unique(STUDENT_UNIQUE_ID))) %>%
+  rename(school_unique_id=SCHOOL_UNIQUE_ID)
+too.big <- merge(x,too.big,by='school_unique_id')
+kable(head(too.big)) %>%
+  kable_styling('striped',bootstrap_options = 'responsive',full_width = 
+                  TRUE)
+```
+
+
+# QUESTION FROM SCHOOL
+
+## Question {.flexbox .vcenter}
+
+"John Smith (Student Unique ID 256595825) left our school to transfer to another Chicago Public School.  We can see on the student system that, John enrolled at Potter High School (School Unique ID 2198052) on 10/14/2016 and remains enrolled: .  Why was he counted as a dropout in the 2015-2016 dropout rate?" 
+
+## Answer
+<div style="padding-top: 60px;">
+Below is John Smith's data from our SAS script.
+
+```{r}
+x <- studentData[studentData$STUDENT_UNIQUE_ID=='256595825',][c("STUDENT_UNIQUE_ID","leave_code","leave_date","verified_transfer","numerator","denominator")]
+kable(x) %>%
+  kable_styling(c('striped'),bootstrap_options = 'responsive')
+```
+<div style='padding-top: 20px'>
+John Smith has a leave code of 31, indicating he has been marked as having transfered to another school on May 24th, 2016. John is listed as having not enrolled in a new school by June 30th, 2016, which is why he is included in the metric.
+</div>
+</div>
+
+# Changes to the metric
+
+##
+Before suggesting any changes to the metric, I need more knowledge on the different scenarios that can occur in practice.
+
+Something to consider when defining metrics is how the metric varies over the population sample. Interact with the graph below by clicking/double clicking on the legend.
+
+```{r}
+x<- studentData %>%
+      group_by(SCHOOL_UNIQUE_ID,STUDENT_RACE) %>%
+      summarise(dropout.rate = sum(numerator,na.rm=TRUE)/sum(denominator,na.rm = TRUE))
+palette <- "Paired"
+p <- ggplot(x,aes(x=dropout.rate,y=stat(count),fill=STUDENT_RACE,color=STUDENT_RACE)) +
+  #geom_histogram() +
+  geom_density(aes(group=STUDENT_RACE,fill=STUDENT_RACE,color=STUDENT_RACE),alpha=.3) +
+  scale_fill_brewer(palette = palette) +
+  scale_color_brewer(palette = palette) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+p <- ggplotly(p)
+
+p$x$data <- lapply(p$x$data,function(data){
+  payload <- data
+  payload$text <- payload$legendgroup
+  return(payload)
+})
+
+p %>% config(displayModeBar = F)
+```
+
+# Fin

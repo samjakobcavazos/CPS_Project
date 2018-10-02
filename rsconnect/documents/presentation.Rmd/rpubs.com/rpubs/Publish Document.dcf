@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/425070/ca38e65cfd60462db8fd02c0d813a758
+bundleId: https://api.rpubs.com/api/v1/document/425070/ca38e65cfd60462db8fd02c0d813a758
+url: http://rpubs.com/samjakobcavazos/425070
+when: 1538503007.39292
