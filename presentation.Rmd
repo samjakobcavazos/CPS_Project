@@ -1,5 +1,6 @@
 ---
-title: "2015-2016 Drop-Out Rate"
+title: "SQRP Data Quality"
+subtitle: "1-Year Drop-out Rate"
 author: "Samuel Cavazos"
 date: "Oct. 3rd, 2018"
 logo: cpslogo.png
@@ -48,13 +49,16 @@ suppressPackageStartupMessages(library(dplyr))
 
 shapeFile <- readRDS('shapeFile.rds')
 library(leaflet)
-color <- colorNumeric('Reds',domain = shapeFile$dropout.rate)
+color <- colorNumeric('Reds',domain = c(0,shapeFile$dropout.rate),
+                      na.color = 'darkslategray4')
 
 #renderLeaflet({
     leaflet(shapeFile,width=500) %>%
       addProviderTiles(providers$CartoDB.Positron) %>%
-      addCircleMarkers(~long,~lat,radius=~dropout.rate,
+      addCircleMarkers(~long,~lat,radius=~.4*dropout.rate,
                        color=~color(dropout.rate),
+                       stroke = FALSE,
+                       fill = ~color(dropout.rate),
                        popup = ~paste(
                          paste0("<b><a href='https://cps.edu/Schools/Pages/school.aspx?SchoolID=",school_id,"'>",short_name,'</a></b>'),
                          paste0('School ID: ',school_id),
@@ -82,6 +86,13 @@ knitr::include_graphics('utrgv.png')
 * [School Closures](https://samjakobcavazos.github.io/personal/chicago-school-timeline-map.html)
 * [Predictive Models using Student Data](https://samjakobcavazos.github.io/personal/predicting-college-admission.html)
 </div>
+</div>
+
+## {.centered}
+<div style="padding-top: 100px;">
+```{r,out.width="75%"}
+knitr::include_graphics('intrinsic-logo.png')
+```
 </div>
 
 # SAS Code
@@ -327,7 +338,7 @@ x<- studentData[studentData$leave_code=='L' &
   mutate(numerator = sapply(numerator,function(i){if (is.na(i)){'Not Assigned'} else {i};}))
 ggplot(x,aes(x = leave_date,y=stat(density),color=numerator,group=numerator)) +
   labs(title = 'Frequency of leave dates by numerator value',
-       x = 'Date',y = 'Number of students') +
+       x = 'Date',y = '% of students') +
   geom_freqpoly() +
   scale_x_date(date_labels = '%b %d \n %Y',limits = c(as.Date('2015-05-01'),as.Date('2016-09-01'))) +
   #facet_wrap(~paste0('Numerator: ',numerator),scales='free_y') +
@@ -385,27 +396,25 @@ kable(head(too.big)) %>%
 
 ## Question {.flexbox .vcenter}
 
-"John Smith (Student Unique ID 256595825) left our school to transfer to another Chicago Public School.  We can see on the student system that, John enrolled at Potter High School (School Unique ID 2198052) on 10/14/2016 and remains enrolled: .  Why was he counted as a dropout in the 2015-2016 dropout rate?" 
+"John Smith (Student Unique ID 256595825) left our school to transfer to another Chicago Public School.  We can see on the student system that, John enrolled at Potter High School (School Unique ID 2198052) on 10/14/2016 and remains enrolled.  Why was he counted as a dropout in the 2015-2016 dropout rate?" 
 
 ## Answer
 <div style="padding-top: 60px;">
 Below is John Smith's data from our SAS script.
 
 ```{r}
-x <- studentData[studentData$STUDENT_UNIQUE_ID=='256595825',][c("STUDENT_UNIQUE_ID","leave_code","leave_date","verified_transfer","numerator","denominator")]
+x <- studentData[studentData$STUDENT_UNIQUE_ID=='256595825',][c("STUDENT_UNIQUE_ID","SCHOOL_UNIQUE_ID","leave_code","leave_date","verified_transfer","numerator","denominator")]
 kable(x) %>%
   kable_styling(c('striped'),bootstrap_options = 'responsive')
 ```
 <div style='padding-top: 20px'>
-John Smith has a leave code of 31, indicating he has been marked as having transfered to another school on May 24th, 2016. John is listed as having not enrolled in a new school by June 30th, 2016, which is why he is included in the metric.
+John Smith has a leave code of 31, which tells us he transferred to another school. John is listed as having not enrolled (transfer status is `N/A`) in a new school by June 30th, 2016, which is why he is included in the metric.
 </div>
 </div>
 
 # Changes to the metric
 
 ##
-Before suggesting any changes to the metric, I need more knowledge on the different scenarios that can occur in practice.
-
 Something to consider when defining metrics is how the metric varies over the population sample. Interact with the graph below by clicking/double clicking on the legend.
 
 ```{r}
@@ -423,7 +432,7 @@ p <- ggplot(x,aes(x=dropout.rate,y=stat(count),fill=STUDENT_RACE,color=STUDENT_R
 p <- ggplotly(p)
 
 p$x$data <- lapply(p$x$data,function(data){
-  payload <- data
+  payload <-  data
   payload$text <- payload$legendgroup
   return(payload)
 })
