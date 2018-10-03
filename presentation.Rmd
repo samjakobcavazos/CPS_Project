@@ -98,14 +98,7 @@ knitr::include_graphics('intrinsic-logo.png')
 # SAS Code
 
 ## 
-
-<div class="notes">
-This is my *note*.
-
-- It can contain markdown
-- like this list
-</div>
-
+[See on Github](https://github.com/samjakobcavazos/CPS_Project/blob/master/SAS_CODE.sas)
 <div class="code-scroll">
 ```sas
 libname datum '~/../myshortcuts/SAS/CPS_Project/perf';
